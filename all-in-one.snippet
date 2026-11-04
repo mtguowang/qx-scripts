@@ -1,0 +1,24 @@
+# 三合一参数提取（顺丰 + 联通 + WPS）—— Quantumult X 原生语法
+#
+# 用法：QX → 配置 → 引用资源 → + → 类型「重写」→ 填
+#   https://cdn.jsdelivr.net/gh/mtguowang/qx-scripts@main/all-in-one.snippet
+#
+# 说明：本文件是 QX 语法（<正则> url script-xxx-body <脚本URL>）。
+#       Surge 的 script-path= / requires-body= 写法 QX 不认，会整行报错。
+
+[rewrite_local]
+
+# ── 顺丰：请求头里取 Cookie ──────────────────────────
+^https:\/\/mcs-mimp-web\.sf-express\.com\/mcs-mimp\/integralPlanet\/getCxAdvertiseList url script-request-header https://cdn.jsdelivr.net/gh/mtguowang/qx-scripts@main/3-in-1-fixed.js
+
+# ── 联通：登录响应（token_online 在这里，主规则）────
+^https:\/\/loginxhm\.10010\.com\/mobileService\/login_vcode_member\.htm url script-response-body https://cdn.jsdelivr.net/gh/mtguowang/qx-scripts@main/3-in-1-fixed.js
+
+# ── 联通：登录请求（兜底）────────────────────────────
+^https:\/\/loginxhm\.10010\.com\/mobileService\/login_vcode_member\.htm url script-request-body https://cdn.jsdelivr.net/gh/mtguowang/qx-scripts@main/3-in-1-fixed.js
+
+# ── WPS：请求头里取 Cookie ───────────────────────────
+^https:\/\/personal-act\.wps\.cn\/activity-rubik\/activity\/component_action url script-request-header https://cdn.jsdelivr.net/gh/mtguowang/qx-scripts@main/3-in-1-fixed.js
+
+[mitm]
+hostname = %APPEND% mcs-mimp-web.sf-express.com, loginxhm.10010.com, personal-act.wps.cn

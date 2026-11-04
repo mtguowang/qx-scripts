@@ -1,0 +1,29 @@
+# 联通 CK 提取（Quantumult X 原生语法）
+
+# ── 用途 ──────────────────────────────────────────────
+# 从联通 App 的短信登录流量里提取 token_online 与 appId，
+# 拼成 `token#appId` 后弹通知，供青龙/签到脚本使用。
+#
+# ── 用法 ──────────────────────────────────────────────
+# QX → 配置 → 引用资源 → 右上角 + → 类型选「重写」
+# 资源地址填本文件的 jsDelivr 地址：
+#   https://cdn.jsdelivr.net/gh/mtguowang/qx-scripts@main/unicom-ck.snippet
+# 然后「全部更新」，确认不再出现红色「N 个问题」。
+#
+# ── 注意 ──────────────────────────────────────────────
+# 1. 本文件是 QX 语法（url + script-xxx-body），不是 Surge 语法。
+#    如果你之前那份是用 `script-path=` / `requires-body=` 写的，
+#    QX 会整行拒收 —— 这就是「4 个问题存在于子资源」的典型原因。
+# 2. 本文件不要加 [Script] 段（那是 Surge 的段名，QX 不认）。
+# 3. hostname 用 %APPEND% 追加，不要写死覆盖，否则会顶掉你其它规则。
+
+[rewrite_local]
+
+# 主规则：登录【响应】—— token_online 在这里
+^https:\/\/loginxhm\.10010\.com\/mobileService\/login_vcode_member\.htm url script-response-body https://cdn.jsdelivr.net/gh/mtguowang/qx-scripts@main/3-in-1-fixed.js
+
+# 兜底：登录【请求】—— 部分版本 token 会随请求带上
+^https:\/\/loginxhm\.10010\.com\/mobileService\/login_vcode_member\.htm url script-request-body https://cdn.jsdelivr.net/gh/mtguowang/qx-scripts@main/3-in-1-fixed.js
+
+[mitm]
+hostname = %APPEND% loginxhm.10010.com

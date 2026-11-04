@@ -1,30 +1,44 @@
-# 联通 CK 提取（Quantumult X 原生语法）v2
+# 联通 CK 提取（Quantumult X 原生语法）v3 —— 真实接口版
+#
+# ── 接口依据 ──────────────────────────────────────────
+# 本机 login-plugin-framework/plugins/unicom.login/manifest.json
+# 真机实测的联通营业厅登录协议：
+#   发码 POST https://m.client.10010.com/mobileService/sendRadomNum.htm
+#   登录 POST https://m.client.10010.com/mobileService/radomLogin.htm
+#   响应 JSON 里取 token_online / ecs_token
+#
+# ⚠️ 旧版脚本钩的 loginxhm.10010.com/mobileService/login_vcode_member.htm
+#    是废弃接口（实测返回 {"code":"1","dsc":"...绑定关系失效..."}），
+#    联通 App 不会请求它 —— 这就是「怎么配都没反应」的根因。
 #
 # ── 用法 ──────────────────────────────────────────────
-# QX → 配置 → 引用资源 → 右上角 + → 类型选「重写」→ 填：
+# QX → 配置 → 引用资源 → + → 类型「重写」→ 填：
 #   https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.snippet
-#
-# 备用镜像（gh-proxy 挂了这个也能用，实测均通）：
+# 备用：
 #   https://ghproxy.net/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.snippet
 #   https://ghfast.top/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.snippet
 #
-# 填完点「全部更新」，确认资源不再标红「N 个问题存在于子资源」。
+# ── 触发条件 ──────────────────────────────────────────
+# 脚本只在「联通 App 发起短信登录」那一刻触发。
+# 已经在登录状态的话，必须【退出登录 → 重新用短信验证码登录】才会走这个接口。
 #
-# ── 注意 ──────────────────────────────────────────────
-# 1. 本文件是 QX 语法（<正则> url script-xxx-body <脚本URL>），不是 Surge 语法。
-#    你之前那份如果写的是 script-path= / requires-body=1，QX 会整行拒收 ——
-#    这就是「4 个问题存在于子资源」最常见的成因。
-# 2. 不要加 [Script] 段（Surge 段名，QX 不认）。
-# 3. hostname 必须带 %APPEND%，否则会覆盖掉你其它规则的 hostname。
-# 4. 正则里的 . 要转义成 \.，否则能匹配到 loginxhmX10010Ycom 之类。
+# ── 前置条件 ──────────────────────────────────────────
+# ① QX 设置 → MitM → 总开关打开
+# ② 证书已生成并安装
+# ③ 设置 → 通用 → 关于本机 → 证书信任设置 → 打开 QX 证书的「完全信任」
+#    ← 装描述文件 ≠ 信任证书，这步最容易漏
+# ④ 主配置 [mitm] 里最好再手动补一个 m.client.10010.com 做双保险
 
 [rewrite_local]
 
-# 主规则：登录【响应】—— token_online 在这里
-^https:\/\/loginxhm\.10010\.com\/mobileService\/login_vcode_member\.htm url script-response-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/3-in-1-fixed.js
+# 请求阶段：抓 appId / deviceId（登录接口）
+^https:\/\/m\.client\.10010\.com\/mobileService\/radomLogin\.htm url script-request-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.js
 
-# 兜底：登录【请求】—— 部分版本 token 会随请求带上
-^https:\/\/loginxhm\.10010\.com\/mobileService\/login_vcode_member\.htm url script-request-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/3-in-1-fixed.js
+# 请求阶段：抓 appId / deviceId（发码接口，兜底）
+^https:\/\/m\.client\.10010\.com\/mobileService\/sendRadomNum\.htm url script-request-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.js
+
+# 响应阶段：解析 token_online / ecs_token
+^https:\/\/m\.client\.10010\.com\/mobileService\/radomLogin\.htm url script-response-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.js
 
 [mitm]
-hostname = %APPEND% loginxhm.10010.com
+hostname = %APPEND% m.client.10010.com

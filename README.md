@@ -2,87 +2,102 @@
 
 Quantumult X 用的联通登录凭证提取脚本。
 
-## 最终结论：三层问题叠加
+## 根因：host 差一个字母
 
-这套东西折腾了好几轮才通，因为「没反应」其实是**三个独立故障叠在一起**，每修一层才露出下一层：
+原脚本 `3-in-1.js` 钩的是：
 
-| 层 | 问题 | 表现 |
+```
+loginxhm.10010.com/mobileService/login_vcode_member.htm
+```
+
+真实抓包（2026-11-04，iPhone 联通 App `iphone_c@12.0900`）显示实际是：
+
+```
+loginxx.10010.com/mobileService/login_vcode_member.htm
+```
+
+**`loginxhm` → `loginxx`，路径完全正确，只有 host 写错。** 所以规则永远不命中。
+
+## 真实接口（抓包实测）
+
+| 用途 | 接口 | 说明 |
 |---|---|---|
-| ① 接口 | 钩的是废弃的 `loginxhm.10010.com/.../login_vcode_member.htm` | 规则永不命中 |
-| ② 语法 | Surge 写法混进 QX，引用资源逐行拒收 | 红色「N 个问题存在于子资源」 |
-| ③ 证书 | **MITM 证书未信任** | 请求端到端直通，**不报任何错误** |
+| 会话/凭证源头 | `POST https://loginxx.10010.com/mobileService/onLine.htm` | `code:"0"` 时返回全套凭证 |
+| 短信登录 | `POST https://loginxx.10010.com/mobileService/login_vcode_member.htm` | 请求体带 `token_online` + `appId` |
 
-第三层最阴：证书没被信任时，QX 不做 TLS 终止，直接把加密流量透传给服务器，Safari 看到的是真实响应 —— 看起来「一切正常」，实际脚本一行都没跑。
-
-**判据**：`probe.snippet` 把响应体替换成 `QX-MITM-OK` 标记，看 Safari 页面内容变不变，完全绕开通知权限。
-
-## 真实接口
-
-来自 `login-plugin-framework/plugins/unicom.login/manifest.json`（真机实测的联通营业厅协议）：
-
-| 用途 | 接口 |
-|---|---|
-| 发码 | `POST https://m.client.10010.com/mobileService/sendRadomNum.htm` |
-| 登录 | `POST https://m.client.10010.com/mobileService/radomLogin.htm` |
-
-token 在**登录响应 JSON**：`$.token_online` / `$.ecs_token`。
-
-`loginxhm.10010.com/mobileService/login_vcode_member.htm` 是废弃接口，实测返回：
+`onLine.htm` 的成功响应示例字段：
 
 ```json
-{"code":"1","dsc":"系统检测到您的账号绑定列表绑定关系失效，为保障您的正常使用，请使用短信验证码重新登录"}
+{
+  "code": "0",
+  "token_online": "841c0cf9194b312d...",
+  "ecs_token": "eyJkYXRhIjoi...",
+  "private_token": "eyJkYXRhIjoi...",
+  "t3_token": "4c15f5acd9b1bd30006cd194751a8fce",
+  "appId": "44fd964cef7a8ced...",
+  "desmobile": "enc_ab66af00843e1628cb8028468c7a02d5",
+  "invalidat": "2026-11-04 14:21:10"
+}
 ```
+
+`appId` / `deviceId` / `deviceCode` 在**请求体**里，`token_online` 等在**响应体**里 —— 所以脚本分请求/响应两段，用 `$prefs` 中转。
+
+## 为什么钩 onLine.htm 而不是登录接口
+
+`onLine.htm` 在 App 启动 / 恢复会话时就会调用，**打开 App 就能拿到凭证，不需要退出登录重来**。
+
+## ⚠️ 凭证有效期问题
+
+抓包里 `invalidat` = `2026-11-04 14:21:10`，而请求时间 `14:16:10` —— **相差正好 5 分钟**。
+
+如果这确实是服务端有效期，那抓来的 ck 不适合直接喂给每日签到脚本。这种情况需要：
+
+- 脚本侧自己刷新 token，或
+- 改用直接登录的方案（`login-plugin-framework` 里的 `unicom.login` 插件）
 
 ## 文件
 
 | 文件 | 说明 |
 |---|---|
-| `unicom.snippet` | **联通提取，主用**（QX 原生语法） |
-| `unicom.js` | 上面的 snippet 引用的脚本 |
-| `probe.snippet` / `probe.js` | MITM 链路探针，排查「没反应」时先跑这个 |
-| `debug.snippet` / `debug.js` | 早期通知版调试，已被 probe 取代 |
-| `qx-local.conf` | 本地配置版，绕过「引用资源」 |
-| `3-in-1-fixed.js` / `all-in-one.snippet` | **联通部分接口是错的，勿用** |
+| `unicom2.snippet` / `unicom2.js` | **联通提取 v2，基于真实抓包，用这个** |
+| `unicom.snippet` / `unicom.js` | v1，接口是 `m.client.10010.com`（也是真实接口，但不是凭证源头） |
+| `probe.snippet` / `probe.js` | MITM 链路探针，排查「没反应」 |
+| `sniff.snippet` / `sniff.js` | 接口嗅探，找 App 真实请求 |
+| `qx-local.conf` | 本地配置版，绕过引用资源 |
+| `3-in-1-fixed.js` / `all-in-one.snippet` | **接口错的，勿用** |
 
 ## 用法
 
-QX → 配置 → 引用资源 → `+` → 类型「重写」→ 填：
-
 ```
-https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.snippet
+https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom2.snippet
 ```
 
 备用镜像：
 
 ```
-https://ghproxy.net/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.snippet
-https://ghfast.top/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.snippet
+https://ghproxy.net/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom2.snippet
+https://ghfast.top/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom2.snippet
 ```
 
-### 前置条件（缺一不可）
+前置条件：
 
 1. QX → 设置 → MitM → 总开关打开
-2. 证书已生成并**安装**
+2. 证书已生成并安装
 3. iOS 设置 → 通用 → 关于本机 → **证书信任设置** → 打开 QX 证书「完全信任」
+   （**装描述文件 ≠ 信任证书**，这步最容易漏，漏了会静默直通、不报任何错）
 
-第 3 步是最容易漏的：**装描述文件 ≠ 信任证书**。
+触发：打开联通 App 即可。
 
-### 触发
+凭证较长（约 2100 字符）会分成多条通知，同时存进 QX 持久化：
+`unicom_ck`（完整凭证）、`unicom_ck_json`（原始响应）。
 
-**必须退出登录，重新走一次短信验证码登录**。脚本只在登录那一刻触发。
+## 踩过的三层坑
 
-成功时通知：
-
-```
-token_online=xxx
-ecs_token=xxx
-appId=xxx
-deviceId=xxx
-```
-
-## 为什么 appId 要分两段抓
-
-`appId`、`deviceId` 在**请求体**，`token_online`、`ecs_token` 在**响应体**。QX 一次脚本执行只能看到一边，所以 `unicom.js` 在请求阶段把两者存进 `$prefs`，响应阶段再读回来拼完整凭证。
+| 层 | 问题 | 表现 |
+|---|---|---|
+| ① 接口 | host 写成 `loginxhm` | 规则永不命中 |
+| ② 语法 | Surge 写法混进 QX | 红色「N 个问题存在于子资源」 |
+| ③ 证书 | MITM 证书未信任 | 请求端到端直通，**不报任何错** |
 
 ## 仓库为什么是 public
 

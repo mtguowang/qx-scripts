@@ -1,0 +1,41 @@
+# MITM 链路探针（Quantumult X 原生语法）
+#
+# ── 作用 ──────────────────────────────────────────────
+# 不靠通知，用「Safari 页面内容变没变」来判断链路通不通。
+# 通知权限关着、通知被折叠、脚本跑了没弹，这些干扰全部绕开。
+#
+# ── 用法 ──────────────────────────────────────────────
+# 1. QX → 配置 → 引用资源 → + → 类型「重写」→ 填：
+#      https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/probe.snippet
+# 2. 「全部更新」，确认无红色问题数、且左侧是勾选状态
+# 3. iPhone Safari 打开：
+#      https://m.client.10010.com/mobileService/radomLogin.htm
+# 4. 对照下表看页面显示什么
+#
+# ── 结果判读 ──────────────────────────────────────────
+# 显示 "QX-MITM-OK …"
+#   → 链路全通。那「没弹窗」纯粹是通知问题，去查：
+#     · iOS 设置 → 通知 → Quantumult X → 允许通知 打开
+#     · QX 设置里的通知开关
+#     · 别用「专注模式/勿扰」挡着
+#
+# 显示 {"code":"0001","dsc":"您输入的号码有误"}
+#   → 请求没被拦截。按顺序查：
+#     · 引用资源里 probe.snippet 是否勾选启用
+#     · QX 设置 → MitM → 总开关是否打开
+#     · 主配置 [mitm] 里是否真的包含 m.client.10010.com
+#
+# 显示证书警告 / 白屏 / 无法建立安全连接
+#   → MITM 证书没被信任。去：
+#     iOS 设置 → 通用 → 关于本机 → 证书信任设置 → 打开 QX 证书「完全信任」
+#     （装描述文件 ≠ 信任证书，这步最容易漏）
+#
+# 显示别的错误页（如 4xx/5xx HTML）
+#   → QX 没在处理这条流量（可能没开代理、或该域名走了别的路径）
+
+[rewrite_local]
+
+^https?:\/\/m\.client\.10010\.com\/ url script-response-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/probe.js
+
+[mitm]
+hostname = %APPEND% m.client.10010.com

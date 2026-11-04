@@ -1,0 +1,52 @@
+# 联通接口嗅探（Quantumult X 原生语法）
+#
+# ⚠️ 诊断专用，找到真实接口后请立即删除本资源。
+#
+# ── 为什么需要它 ──────────────────────────────────────
+# 现象：Safari 访问 m.client.10010.com/mobileService/radomLogin.htm 能弹通知，
+#       但联通 App 里登录时完全拦不到。
+# 说明 App 的登录请求走的不是这个地址。
+#
+# 而且此前只把 m.client.10010.com 放进了 MITM 列表 ——
+# 联通 App 会跟多个 10010.com 子域通信，真实接口若不在该 host 上，
+# QX 连看都看不到。本文件把 *.10010.com 全部纳入 MITM。
+#
+# ── 用法 ──────────────────────────────────────────────
+# 1. QX → 配置 → 引用资源 → + → 类型「重写」→ 填：
+#      https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/sniff.snippet
+# 2. 「全部更新」，确认勾选启用
+# 3. 打开联通 App，走一次短信登录（退出登录再登）
+# 4. 把弹出的「联通嗅探」通知截图或抄下来发我
+#
+# ── 会看到什么 ────────────────────────────────────────
+# 每条通知包含：真实路径 / 方法 / query 字段名 / body 长度 / UA
+# 只报疑似登录相关的请求（含 login、vcode、token、.htm 等关键字），不刷屏。
+# 不含任何参数值，不会泄露手机号。
+#
+# ── 几种结果的含义 ────────────────────────────────────
+# · 弹出了新的 10010 地址 → 那才是真实登录接口，照它改规则
+# · 一条都不弹，但 QX 日志里有 10010 记录 → 接口不含登录关键字，需要放宽过滤
+# · 一条都不弹，QX 日志里也没有 → 见下方「App 拦不到的三种可能」
+#
+# ── App 拦不到的三种可能 ──────────────────────────────
+# ① App 用了证书固定（SSL Pinning）
+#    表现：加上 *.10010.com 后 App 报网络错误 / 登录失败 / 一直转圈
+#    原因：App 只信任自己的证书，QX 出示的证书被拒
+#
+# ② App 走 QUIC / HTTP3（UDP 443）
+#    表现：日志里完全看不到该 App 的请求
+#    验证：加一条屏蔽 QUIC 的规则，逼它回落 TCP
+#      [filter_local]
+#      udp, 443, reject
+#
+# ③ App 走了别的域名（不是 10010.com）
+#    表现：日志里出现的都是别的域名
+#    办法：把 MITM 放宽到那些域名再嗅一次
+
+[rewrite_local]
+
+# 捕获所有 10010.com 子域的请求（脚本内部再做关键字过滤）
+^https?:\/\/[^\/]*10010\.com\// url script-request-header https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/sniff.js
+
+[mitm]
+hostname = %APPEND% *.10010.com, 10010.com

@@ -1,0 +1,49 @@
+# 联通凭证提取 v2 —— 基于真实抓包修正（Quantumult X 原生语法）
+#
+# ── 相对 v1 的关键修正 ────────────────────────────────
+#   真实 host：loginxx.10010.com
+#   原脚本：  loginxhm.10010.com     ← 一个字母之差，所以永远不命中
+#
+# 依据：2026-11-04 iPhone 联通 App 12.0900 抓包
+#   [161] POST https://loginxx.10010.com/mobileService/onLine.htm
+#         响应 code:"0" → token_online / ecs_token / private_token /
+#                          t3_token / appId / desmobile / invalidat
+#   [170] POST https://loginxx.10010.com/mobileService/login_vcode_member.htm
+#         请求体含 token_online + appId；失败时 {"code":"0001","dsc":"列表为空"}
+#
+# ── 用法 ──────────────────────────────────────────────
+# QX → 配置 → 引用资源 → + → 类型「重写」→ 填：
+#   https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom2.snippet
+#
+# 前置：MitM 总开关打开 + 证书已安装且「完全信任」
+#
+# ── 触发条件 ──────────────────────────────────────────
+# onLine.htm 在 App 启动 / 恢复会话时就调用，
+# 所以【打开联通 App】即可，不用退出登录重来。
+#
+# ── 输出 ──────────────────────────────────────────────
+# token_online / ecs_token / private_token / t3_token /
+# appId / deviceId / deviceCode / desmobile / invalidat
+# 凭证较长会分成多条通知（每条 240 字符），同时存进 QX 持久化：
+#   unicom_ck      完整凭证文本
+#   unicom_ck_json 原始响应 JSON
+#
+# ── 重要提醒 ──────────────────────────────────────────
+# 抓包里 invalidat 显示凭证约 5 分钟后失效
+#   （请求 14:16:10 → invalidat 14:21:10）
+# 若确实如此，抓来的 ck 不适合直接喂给每日签到脚本，
+# 需要脚本侧自行刷新，或改用直接登录（你的 unicom.login 插件）方案。
+
+[rewrite_local]
+
+# 请求阶段：抓 appId / deviceId / deviceCode
+^https:\/\/loginxx\.10010\.com\/mobileService\/onLine\.htm url script-request-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom2.js
+
+# 响应阶段：解析凭证（主规则）
+^https:\/\/loginxx\.10010\.com\/mobileService\/onLine\.htm url script-response-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom2.js
+
+# 备用：短信登录响应
+^https:\/\/loginxx\.10010\.com\/mobileService\/login_vcode_member\.htm url script-response-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom2.js
+
+[mitm]
+hostname = %APPEND% loginxx.10010.com

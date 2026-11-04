@@ -1,70 +1,88 @@
 # qx-scripts
 
-Quantumult X 用的参数提取脚本。原脚本来自 [Tzbfire/cloud](https://github.com/Tzbfire/cloud) 的 `3-in-1.js`，这里放的是修过联通分支的版本。
+Quantumult X 用的联通登录凭证提取脚本。
+
+## 根因：原脚本钩错了接口
+
+原脚本来自 [Tzbfire/cloud](https://github.com/Tzbfire/cloud) 的 `3-in-1.js`，联通分支钩的是：
+
+```
+loginxhm.10010.com/mobileService/login_vcode_member.htm
+```
+
+实测这个地址返回：
+
+```json
+{"code":"1","dsc":"系统检测到您的账号绑定列表绑定关系失效，为保障您的正常使用，请使用短信验证码重新登录"}
+```
+
+**这是废弃的旧接口**，联通 App 根本不会请求它。所以规则永远不命中 —— MITM 开没开、脚本对不对，都不影响「没反应」这个结果。
+
+真实接口（来自本机 `login-plugin-framework/plugins/unicom.login/manifest.json`，真机实测过的联通营业厅登录协议）：
+
+| 用途 | 接口 |
+|---|---|
+| 发码 | `POST https://m.client.10010.com/mobileService/sendRadomNum.htm` |
+| 登录 | `POST https://m.client.10010.com/mobileService/radomLogin.htm` |
+
+token 在**登录响应 JSON** 里：`$.token_online` / `$.ecs_token`。
+
+另外原脚本还有个独立 bug：它在**登录请求**里找 `token_online`，但那玩意儿是登录成功后才下发的，条件 `if (appId && tokenOnline)` 恒为假。
 
 ## 文件
 
 | 文件 | 说明 |
 |---|---|
-| `3-in-1-fixed.js` | 修正版脚本，顺丰 / 联通 / WPS 三合一 |
-| `unicom-ck.snippet` | 联通专用的 QX 引用资源（QX 原生语法） |
-| `all-in-one.snippet` | 三合一引用资源（顺丰 + 联通 + WPS） |
+| `unicom.snippet` | **联通提取，用这个**（QX 原生语法） |
+| `unicom.js` | 上面的 snippet 引用的脚本 |
+| `debug.snippet` / `debug.js` | 链路自测：证明 MITM + 规则 + 脚本是否生效 |
+| `3-in-1-fixed.js` | 早期三合一修正版，**联通部分接口仍是错的，勿用** |
+| `all-in-one.snippet` | 同上，**勿用** |
 
-## 原脚本联通分支为什么没反应
-
-原版钩的是**短信登录接口的请求体**，却要取 `token_online`：
-
-```js
-const tokenOnline = body.match(/token_online=([^&]+)/)?.[1];
-if (appId && tokenOnline) { ... }   // 恒为假
-```
-
-`token_online` 是**登录成功之后**服务端下发的，登录请求发出的那一刻 App 手里还没有它。所以条件永远不成立，不弹通知也不打日志 —— 表现就是「没反应」。
-
-另外原版收尾是 `$done({ body })`，当 QX 没抓到正文时 `body` 是空串，等于把请求体清空回写给 App，可能直接导致登录失败。
-
-修正版：
-1. 请求 / 响应双兼容；
-2. 规则一命中就必弹自检通知，能区分「规则没命中」和「命中了但没提取到」；
-3. 回写前判空，没内容就原样放行；
-4. 参数名多别名匹配，form 和 JSON 正文都能取。
-
-## 快速开始
+## 用法
 
 QX → 配置 → 引用资源 → `+` → 类型「重写」→ 填：
 
 ```
-https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom-ck.snippet
+https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.snippet
 ```
 
-备用镜像（gh-proxy 挂了再换，实测均可通）：
+备用镜像：
 
 ```
-https://ghfast.top/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom-ck.snippet
-https://ghproxy.net/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom-ck.snippet
+https://ghproxy.net/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.snippet
+https://ghfast.top/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.snippet
 ```
 
-然后「全部更新」，确认资源不再标红。
+前置条件：
 
-再打开联通 App 走一次短信登录，应收到：
+1. QX → 设置 → MitM → 总开关打开
+2. 证书已生成并安装
+3. 设置 → 通用 → 关于本机 → 证书信任设置 → 打开 QX 证书「完全信任」
+   （**装描述文件 ≠ 信任证书**，这步最容易漏）
+
+触发：**必须退出登录，重新走一次短信验证码登录**。脚本只在登录那一刻触发，已经在登录状态时不会跑。
+
+成功时通知内容：
 
 ```
-[联通] ✅ 参数提取成功
-响应
-eyJhbGciOiJIUzI1NiJ9.xxxx#你的appId
+token_online=xxx
+ecs_token=xxx
+appId=xxx
+deviceId=xxx
 ```
 
-如果收到的是 `[联通] 已命中，但没取到 token`，看通知里列的「现有字段」，那就是该接口真实带的参数名，照着改 `3-in-1-fixed.js` 里 `pick()` 的候选数组即可。
+## 先跑自测，别直接试
 
-## 「N 个问题存在于子资源」怎么排
+如果还是没反应，先加 `debug.snippet`，然后用 Safari 访问：
 
-QX 对引用资源做逐行校验，一行不合法就算一个问题。常见原因：
+```
+https://m.client.10010.com/mobileService/radomLogin.htm
+```
 
-1. **用了 Surge 语法**：`http-request <url> script-path=xxx, requires-body=1, tag=xxx`
-   → QX 要的是 `<正则> url script-response-body <脚本URL>`，整行会被拒。
-2. **段名写成 `[Script]`**：那是 Surge 的，QX 只认 `[rewrite_local]`。
-3. **hostname 没写 `%APPEND%`**：会覆盖而不是追加。
-4. **正则里的转义丢失**：`https:\/\/` 少了反斜杠、或 `?` 没转义成 `\?`。
-5. **行尾有全角空格 / 中文标点**：肉眼看不见，QX 直接判非法。
+- **弹通知** → MITM/证书/规则/脚本四层全通，问题只可能在「你没重新登录」
+- **不弹** → 断在 MITM 层，按上面前置条件逐条查
 
-把资源内容贴进任意文本编辑器，开「显示不可见字符」对一遍最快。
+## 为什么 appId 要分两段抓
+
+`appId`、`deviceId` 在**请求体**里，`token_online`、`ecs_token` 在**响应体**里。QX 一次脚本执行只能看到其中一边，所以 `unicom.js` 在请求阶段把 `appId`/`deviceId` 存进 `$prefs`，响应阶段再读回来拼成完整凭证。

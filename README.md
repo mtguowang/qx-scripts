@@ -34,7 +34,14 @@ if (appId && tokenOnline) { ... }   // 恒为假
 QX → 配置 → 引用资源 → `+` → 类型「重写」→ 填：
 
 ```
-https://cdn.jsdelivr.net/gh/mtguowang/qx-scripts@main/unicom-ck.snippet
+https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom-ck.snippet
+```
+
+备用镜像（gh-proxy 挂了再换，实测均可通）：
+
+```
+https://ghfast.top/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom-ck.snippet
+https://ghproxy.net/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom-ck.snippet
 ```
 
 然后「全部更新」，确认资源不再标红。

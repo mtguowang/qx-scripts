@@ -6,8 +6,8 @@
 #
 # ── 用法 ──────────────────────────────────────────────
 # QX → 配置 → 引用资源 → 右上角 + → 类型选「重写」
-# 资源地址填本文件的 jsDelivr 地址：
-#   https://cdn.jsdelivr.net/gh/mtguowang/qx-scripts@main/unicom-ck.snippet
+# 资源地址填本文件的镜像地址（raw 直连国内超时，必须走镜像）：
+#   https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom-ck.snippet
 # 然后「全部更新」，确认不再出现红色「N 个问题」。
 #
 # ── 注意 ──────────────────────────────────────────────
@@ -20,10 +20,10 @@
 [rewrite_local]
 
 # 主规则：登录【响应】—— token_online 在这里
-^https:\/\/loginxhm\.10010\.com\/mobileService\/login_vcode_member\.htm url script-response-body https://cdn.jsdelivr.net/gh/mtguowang/qx-scripts@main/3-in-1-fixed.js
+^https:\/\/loginxhm\.10010\.com\/mobileService\/login_vcode_member\.htm url script-response-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/3-in-1-fixed.js
 
 # 兜底：登录【请求】—— 部分版本 token 会随请求带上
-^https:\/\/loginxhm\.10010\.com\/mobileService\/login_vcode_member\.htm url script-request-body https://cdn.jsdelivr.net/gh/mtguowang/qx-scripts@main/3-in-1-fixed.js
+^https:\/\/loginxhm\.10010\.com\/mobileService\/login_vcode_member\.htm url script-request-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/3-in-1-fixed.js
 
 [mitm]
 hostname = %APPEND% loginxhm.10010.com

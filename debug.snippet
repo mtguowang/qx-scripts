@@ -1,0 +1,37 @@
+# 联通链路自测（Quantumult X 原生语法）v2
+#
+# ── 这个文件干什么 ────────────────────────────────────
+# 只要 m.client.10010.com 下有任意请求经过 QX，就弹一条通知。
+# 它不关心有没有 token，能干净地回答：
+#   「是规则/脚本没生效，还是只是没取到 token？」
+#
+# ── 怎么用（不用联通 App，不用重新登录）────────────────
+# 1. QX → 配置 → 引用资源 → + → 类型「重写」→ 填：
+#      https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/debug.snippet
+# 2. 「全部更新」，确认无红色问题数
+# 3. Safari 地址栏访问：
+#      https://m.client.10010.com/mobileService/radomLogin.htm
+#    （会返回 405/错误 JSON，无所谓，重点是 QX 拦到请求）
+# 4. 看有没有弹通知：
+#      弹了 → MITM、证书、规则、脚本 四层全通
+#      没弹 → 断在 MITM，按下面「排障」查
+#
+# ── 排障（没弹时按顺序查）──────────────────────────────
+# ① QX 设置 → MitM → 「MitM 总开关」打开
+# ② 同页面确认证书已生成、已安装
+# ③ 设置 → 通用 → 关于本机 → 证书信任设置 →
+#    打开 Quantumult X 证书的「完全信任」
+#    ← 90% 的人漏这步：装描述文件 ≠ 信任证书
+# ④ 引用资源里确认 debug.snippet 已勾选启用
+# ⑤ 主配置 [mitm] 手动补：m.client.10010.com
+
+[rewrite_local]
+
+# 请求阶段
+^https?:\/\/m\.client\.10010\.com\/ url script-request-header https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/debug.js
+
+# 响应阶段
+^https?:\/\/m\.client\.10010\.com\/ url script-response-header https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/debug.js
+
+[mitm]
+hostname = %APPEND% m.client.10010.com

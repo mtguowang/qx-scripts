@@ -1,0 +1,30 @@
+# 联通 CK 提取（Quantumult X 原生语法）v2
+#
+# ── 用法 ──────────────────────────────────────────────
+# QX → 配置 → 引用资源 → 右上角 + → 类型选「重写」→ 填：
+#   https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.snippet
+#
+# 备用镜像（gh-proxy 挂了这个也能用，实测均通）：
+#   https://ghproxy.net/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.snippet
+#   https://ghfast.top/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom.snippet
+#
+# 填完点「全部更新」，确认资源不再标红「N 个问题存在于子资源」。
+#
+# ── 注意 ──────────────────────────────────────────────
+# 1. 本文件是 QX 语法（<正则> url script-xxx-body <脚本URL>），不是 Surge 语法。
+#    你之前那份如果写的是 script-path= / requires-body=1，QX 会整行拒收 ——
+#    这就是「4 个问题存在于子资源」最常见的成因。
+# 2. 不要加 [Script] 段（Surge 段名，QX 不认）。
+# 3. hostname 必须带 %APPEND%，否则会覆盖掉你其它规则的 hostname。
+# 4. 正则里的 . 要转义成 \.，否则能匹配到 loginxhmX10010Ycom 之类。
+
+[rewrite_local]
+
+# 主规则：登录【响应】—— token_online 在这里
+^https:\/\/loginxhm\.10010\.com\/mobileService\/login_vcode_member\.htm url script-response-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/3-in-1-fixed.js
+
+# 兜底：登录【请求】—— 部分版本 token 会随请求带上
+^https:\/\/loginxhm\.10010\.com\/mobileService\/login_vcode_member\.htm url script-request-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/3-in-1-fixed.js
+
+[mitm]
+hostname = %APPEND% loginxhm.10010.com

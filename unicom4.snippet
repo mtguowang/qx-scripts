@@ -1,0 +1,45 @@
+# 联通凭证提取 v4 —— 只弹 token_online#appId（Quantumult X 原生语法）
+#
+# ── 这一版只做一件事 ──────────────────────────────────
+# 弹出 `token_online#appId` 拼接值（原版 3-in-1.js 输出的就是它）。
+#
+# 该值约 929 字符（token_online 736 + # + appId 192），
+# 单条 iOS 通知装不下，按 400 字符分成 3 条，
+# 标题标明 (1/3)(2/3)(3/3)，副标题标明是第几到第几字符。
+#
+# 想改分段大小：编辑 unicom4.js 顶部
+#   var PART = 400;   // 调大 = 条数少但每条更长；调小 = 条数多但更短
+#
+# 完整凭证（ecs_token / private_token / t3_token / deviceId /
+# deviceCode / desmobile / invalidat）不再弹窗，只写日志 + 存持久化：
+#   unicom_line   token_online#appId
+#   unicom_ck     完整凭证文本
+#   unicom_ck_json 原始响应
+#
+# ── 真实接口（2026-11-04 抓包实测）────────────────────
+#   POST https://loginxx.10010.com/mobileService/onLine.htm
+#   POST https://loginxx.10010.com/mobileService/login_vcode_member.htm
+# ⚠️ host 是 loginxx，不是 loginxhm
+#
+# ── 用法 ──────────────────────────────────────────────
+# QX → 配置 → 引用资源 → + → 类型「重写」→ 填：
+#   https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom4.snippet
+# 前置：MitM 总开关打开 + 证书已安装且「完全信任」
+# 触发：完全关掉联通 App（后台划掉），重新打开
+#
+# 之前那些资源（unicom.snippet / unicom2.snippet / unicom3.snippet /
+# probe / debug / sniff / 旧的「联通 ck」）全部删掉，只留这一个。
+
+[rewrite_local]
+
+# 请求阶段：抓 appId / deviceId / deviceCode
+^https:\/\/loginxx\.10010\.com\/mobileService\/onLine\.htm url script-request-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom4.js
+
+# 响应阶段：拼 token_online#appId（主规则）
+^https:\/\/loginxx\.10010\.com\/mobileService\/onLine\.htm url script-response-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom4.js
+
+# 备用：短信登录响应
+^https:\/\/loginxx\.10010\.com\/mobileService\/login_vcode_member\.htm url script-response-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom4.js
+
+[mitm]
+hostname = %APPEND% loginxx.10010.com

@@ -1,0 +1,53 @@
+# 联通凭证提取 v6 —— 静默捕获 + 按需查看（Quantumult X 原生语法）
+#
+# ── 为什么不再弹通知 ──────────────────────────────────
+# token_online 是【滚动令牌】：onLine.htm 每被调用一次，服务端就签发一个新的。
+# 配合 invalidat 永远等于「当前时间 + 5 分钟」，说明它设计上就是短命且一次性的。
+#
+# 实测三次捕获：
+#   14:43:37  b05730e2...84d5d + 480fb5e3...
+#   14:43:48  b05730e2...84d5d + 7128a059...   ← 后半段变了
+#   17:20:21  037cc84a...                      ← 完全换了一个
+#
+# 所以「每刷新一次 App 就弹一次」只会刷屏，而且弹出来的值下一秒就作废。
+# 本版改成静默写入本地，你想取的时候主动去拿。
+#
+# ── 怎么取值 ─────────────────────────────────────────
+# 1. 先在联通 App 里正常用一下（打开、下拉刷新都行），让它触发 onLine.htm
+# 2. Safari 打开下面这个地址：
+#      https://loginxx.10010.com/mobileService/onLine.htm?__ck__
+# 3. 页面会直接显示完整的 token_online#appId
+#    → 全选复制即可，不受通知长度限制，也不会被截断
+#
+# ?__ck__ 是暗号：脚本看到它就吐出存好的值，真实请求不受影响。
+#
+# ── 想恢复弹通知 ─────────────────────────────────────
+# 编辑 unicom6.js 顶部：
+#   var NOTIFY_ON_CAPTURE = false;  → 改 true
+#   var NOTIFY_ON_FAIL = false;     → 改 true
+#
+# ── 真实接口（抓包实测）───────────────────────────────
+#   POST https://loginxx.10010.com/mobileService/onLine.htm
+#   POST https://loginxx.10010.com/mobileService/login_vcode_member.htm
+# ⚠️ host 是 loginxx，不是 loginxhm（原 3-in-1.js 写错的那个）
+#
+# ── 用法 ──────────────────────────────────────────────
+# QX → 配置 → 引用资源 → + → 类型「重写」→ 填：
+#   https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom6.snippet
+# 前置：MitM 总开关打开 + 证书已安装且「完全信任」
+# 清理：只留本资源，旧的 unicom / unicom2 / unicom3 / unicom4 / unicom5 /
+#       probe / debug / sniff 全部删除
+
+[rewrite_local]
+
+# 请求阶段：抓 appId / deviceId / deviceCode
+^https:\/\/loginxx\.10010\.com\/mobileService\/onLine\.htm url script-request-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom6.js
+
+# 响应阶段：静默捕获 / 取值（主规则）
+^https:\/\/loginxx\.10010\.com\/mobileService\/onLine\.htm url script-response-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom6.js
+
+# 备用：短信登录响应
+^https:\/\/loginxx\.10010\.com\/mobileService\/login_vcode_member\.htm url script-response-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom6.js
+
+[mitm]
+hostname = %APPEND% loginxx.10010.com

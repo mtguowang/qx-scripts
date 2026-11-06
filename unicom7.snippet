@@ -1,0 +1,45 @@
+# 联通凭证提取 v7 —— 只弹「已获取」，不弹「失败」（Quantumult X 原生语法）
+#
+# ── 这一版就是按你的要求调的 ──────────────────────────
+#   ✅ 保留：  [联通] ✅ 已获取  929 字符 · 过期 ...
+#   ❌ 去掉：  [联通] 失败  code=0001 · login_vcode_member.htm  列表为空
+#
+# 失败那类只在 QX 日志里留一行，不再弹窗。
+#
+# ── 如果嫌「已获取」弹得太勤 ──────────────────────────
+# onLine.htm 是会话刷新接口，App 每次刷新都会签发新 token，
+# 所以每次刷新都会弹一条。想节流就编辑 unicom7.js 顶部：
+#
+#   var NOTIFY_MIN_INTERVAL_MS = 0;      // 默认不节流
+#   var NOTIFY_MIN_INTERVAL_MS = 60000;  // 改这样：一分钟内最多弹一次
+#   var NOTIFY_MIN_INTERVAL_MS = 300000; // 五分钟一次
+#
+# ── 想拿完整值（通知会被 iOS 截断）──────────────────────
+# Safari 打开：
+#   https://loginxx.10010.com/mobileService/onLine.htm?__ck__
+# 页面直接显示完整 token_online#appId，可全选复制。
+#
+# ── 真实接口（2026-11-04 抓包实测）────────────────────
+#   POST https://loginxx.10010.com/mobileService/onLine.htm
+#   POST https://loginxx.10010.com/mobileService/login_vcode_member.htm
+# ⚠️ host 是 loginxx，不是 loginxhm（原 3-in-1.js 写错的那个）
+#
+# ── 用法 ──────────────────────────────────────────────
+# QX → 配置 → 引用资源 → + → 类型「重写」→ 填：
+#   https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom7.snippet
+# 前置：MitM 总开关打开 + 证书已安装且「完全信任」
+# 清理：只留本资源，旧的 unicom / unicom2~6 / probe / debug / sniff 全部删除
+
+[rewrite_local]
+
+# 请求阶段：抓 appId / deviceId / deviceCode
+^https:\/\/loginxx\.10010\.com\/mobileService\/onLine\.htm url script-request-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom7.js
+
+# 响应阶段：捕获 + 取值（主规则）
+^https:\/\/loginxx\.10010\.com\/mobileService\/onLine\.htm url script-response-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom7.js
+
+# 备用：短信登录响应（成功才弹，失败静默）
+^https:\/\/loginxx\.10010\.com\/mobileService\/login_vcode_member\.htm url script-response-body https://gh-proxy.com/https://raw.githubusercontent.com/mtguowang/qx-scripts/main/unicom7.js
+
+[mitm]
+hostname = %APPEND% loginxx.10010.com
